@@ -3,10 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
-import { formatDateShort, formatTime, todayISO } from "@/lib/dates";
+import { formatDateShort, formatDateTime, formatTime, todayISO } from "@/lib/dates";
 import { EmailStatusPanel } from "@/components/admin/EmailStatusPanel";
+import { isHoldExpired } from "@/lib/deposit";
 import type { EmailHealth } from "@/lib/email-health";
-import { formatMoney } from "@/lib/site";
+import { formatMoney, site } from "@/lib/site";
 import type { Booking, BookingStatus, EmailDelivery } from "@/lib/types";
 
 const STATUS_STYLES: Record<BookingStatus, string> = {
@@ -17,12 +18,20 @@ const STATUS_STYLES: Record<BookingStatus, string> = {
   completed: "bg-grape/15 text-[#4c1d95] border-grape/30",
 };
 
-const FILTERS: { key: "all" | BookingStatus; label: string }[] = [
+/** A lapsed hold is still "pending" in storage but no longer needs a decision. */
+type FilterKey = "all" | "expired" | BookingStatus;
+
+function filterKeyOf(booking: Booking): FilterKey {
+  return isHoldExpired(booking) ? "expired" : booking.status;
+}
+
+const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "pending", label: "Needs a decision" },
   { key: "confirmed", label: "Confirmed" },
   { key: "completed", label: "Completed" },
   { key: "declined", label: "Declined" },
   { key: "cancelled", label: "Cancelled" },
+  { key: "expired", label: "Deposit never came" },
   { key: "all", label: "Everything" },
 ];
 
@@ -34,7 +43,7 @@ export function BookingsBoard({
   emailHealth: EmailHealth;
 }) {
   const router = useRouter();
-  const [filter, setFilter] = useState<"all" | BookingStatus>("pending");
+  const [filter, setFilter] = useState<FilterKey>("pending");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [flash, setFlash] = useState<{ tone: "good" | "bad"; text: string } | null>(
     null,
@@ -43,7 +52,8 @@ export function BookingsBoard({
   const counts = useMemo(() => {
     const out: Record<string, number> = { all: bookings.length };
     for (const booking of bookings) {
-      out[booking.status] = (out[booking.status] ?? 0) + 1;
+      const key = filterKeyOf(booking);
+      out[key] = (out[key] ?? 0) + 1;
     }
     return out;
   }, [bookings]);
@@ -52,7 +62,7 @@ export function BookingsBoard({
     () =>
       filter === "all"
         ? bookings
-        : bookings.filter((booking) => booking.status === filter),
+        : bookings.filter((booking) => filterKeyOf(booking) === filter),
     [bookings, filter],
   );
 
@@ -64,7 +74,7 @@ export function BookingsBoard({
   async function changeStatus(
     booking: Booking,
     status: BookingStatus,
-    options: { promptNote?: boolean } = {},
+    options: { promptNote?: boolean; depositReceived?: boolean } = {},
   ) {
     let ownerNote = booking.ownerNote;
 
@@ -87,7 +97,12 @@ export function BookingsBoard({
       const response = await fetch(`/api/admin/bookings/${booking.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, ownerNote, notify: true }),
+        body: JSON.stringify({
+          status,
+          ownerNote,
+          notify: true,
+          depositReceived: options.depositReceived ?? false,
+        }),
       });
       const data = await response.json();
 
@@ -182,7 +197,9 @@ export function BookingsBoard({
           <p className="mt-2 text-sm text-muted">
             {filter === "pending"
               ? "No bookings are waiting on a decision. Nice."
-              : "No bookings match this filter yet."}
+              : filter === "expired"
+                ? "No requests have lapsed without a deposit."
+                : "No bookings match this filter yet."}
           </p>
         </div>
       ) : (
@@ -190,6 +207,11 @@ export function BookingsBoard({
           {visible.map((booking) => {
             const busy = busyId === booking.id;
             const past = booking.endDate < today;
+            const expired = isHoldExpired(booking);
+            const awaitingDeposit =
+              booking.status === "pending" &&
+              booking.depositDueBy !== undefined &&
+              !booking.depositReceivedAt;
 
             return (
               <li key={booking.id} className="card overflow-hidden">
@@ -197,9 +219,11 @@ export function BookingsBoard({
                   <div className="min-w-56 flex-1">
                     <div className="flex flex-wrap items-center gap-2.5">
                       <span
-                        className={`rounded-full border px-2.5 py-1 text-[0.7rem] font-extrabold uppercase tracking-wider ${STATUS_STYLES[booking.status]}`}
+                        className={`rounded-full border px-2.5 py-1 text-[0.7rem] font-extrabold uppercase tracking-wider ${
+                          expired ? STATUS_STYLES.declined : STATUS_STYLES[booking.status]
+                        }`}
                       >
-                        {booking.status}
+                        {expired ? "hold expired" : booking.status}
                       </span>
                       <span className="font-mono text-xs font-bold text-muted">
                         {booking.reference}
@@ -253,6 +277,7 @@ export function BookingsBoard({
                       label="Quoted"
                       value={formatMoney(booking.quote.total)}
                     />
+                    <DepositRow booking={booking} expired={expired} />
                   </dl>
                 </div>
 
@@ -279,7 +304,25 @@ export function BookingsBoard({
                 )}
 
                 <div className="flex flex-wrap items-center gap-2 border-t border-line px-6 py-4">
-                  {booking.status !== "confirmed" && (
+                  {awaitingDeposit && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        changeStatus(booking, "confirmed", {
+                          promptNote: true,
+                          depositReceived: true,
+                        })
+                      }
+                      className="btn btn-primary px-5 py-2.5 text-sm"
+                    >
+                      {busy
+                        ? "Working…"
+                        : `${formatMoney(site.deposit.amount)} received · Confirm`}
+                    </button>
+                  )}
+
+                  {booking.status !== "confirmed" && !awaitingDeposit && (
                     <button
                       type="button"
                       disabled={busy}
@@ -388,6 +431,29 @@ function EmailBadge({ delivery }: { delivery?: EmailDelivery }) {
     >
       {notConfigured ? "Email not configured" : `Email failed → ${parts.join(" + ")}`}
     </span>
+  );
+}
+
+/**
+ * Where this booking's deposit stands. Requests from before deposits existed
+ * have no due date and were never asked for one.
+ */
+function DepositRow({ booking, expired }: { booking: Booking; expired: boolean }) {
+  if (booking.depositReceivedAt) {
+    return (
+      <Row
+        label="Deposit"
+        value={`${formatMoney(site.deposit.amount)} received`}
+      />
+    );
+  }
+  if (!booking.depositDueBy) return null;
+  if (expired) {
+    return <Row label="Deposit" value="Never came · dates released" />;
+  }
+  if (booking.status !== "pending") return null;
+  return (
+    <Row label="Deposit due" value={formatDateTime(booking.depositDueBy)} />
   );
 }
 

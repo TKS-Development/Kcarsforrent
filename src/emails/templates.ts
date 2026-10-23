@@ -1,4 +1,5 @@
-import { formatDateLong, formatTime } from "@/lib/dates";
+import { formatDateLong, formatDateTime, formatTime } from "@/lib/dates";
+import { balanceDue, paymentMethods } from "@/lib/deposit";
 import { formatMoney, site } from "@/lib/site";
 import type { Booking } from "@/lib/types";
 
@@ -52,6 +53,51 @@ function quoteBlock(booking: Booking) {
   );
 }
 
+const deposit = () => formatMoney(site.deposit.amount);
+
+/** Deadline wording, for requests that have one. */
+function dueBy(booking: Booking): string {
+  return booking.depositDueBy
+    ? formatDateTime(booking.depositDueBy)
+    : `within ${site.deposit.holdHours} hours`;
+}
+
+/** How to pay the deposit, as HTML. */
+function depositInstructions(booking: Booking): string {
+  const methods = paymentMethods();
+  const list = methods.length
+    ? detailTable(
+        methods.map((m) => ({
+          label: m.label,
+          value: m.url
+            ? `<a href="${escapeHtml(m.url)}" style="color:#d6206a;">${escapeHtml(m.value)}</a>`
+            : escapeHtml(m.value),
+        })),
+      )
+    : `<p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#4a343e;">We'll text you how to send it.</p>`;
+
+  return `
+    ${callout(`<strong>Your dates are held until ${escapeHtml(dueBy(booking))}.</strong> Send the ${deposit()} deposit by then to lock them in — otherwise they're released for someone else.`, "warn")}
+    <h2 style="margin:0 0 12px;font-size:16px;font-weight:700;">Send your ${deposit()} deposit</h2>
+    ${list}
+    <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#4a343e;">
+      Put <strong>${escapeHtml(booking.reference)}</strong> in the payment note so we can match it to your booking. The deposit goes toward your total — the remaining ${formatMoney(balanceDue(booking.quote.total))} is due at pick-up.
+    </p>`;
+}
+
+function depositInstructionsText(booking: Booking): string {
+  const methods = paymentMethods();
+  const lines = methods.length
+    ? methods.map((m) => `  ${m.label}: ${m.value}`).join("\n")
+    : "  We'll text you how to send it.";
+  return `YOUR DATES ARE HELD UNTIL ${dueBy(booking).toUpperCase()}.
+Send the ${deposit()} deposit by then to lock them in — otherwise they're released for someone else.
+
+${lines}
+
+Put ${booking.reference} in the payment note so we can match it to your booking. The deposit goes toward your total — the remaining ${formatMoney(balanceDue(booking.quote.total))} is due at pick-up.`;
+}
+
 function plainSummary(booking: Booking): string {
   return [
     `Reference: ${booking.reference}`,
@@ -71,38 +117,38 @@ export function customerRequestReceived(booking: Booking): RenderedEmail {
   const html = emailLayout({
     preheader: `We've got your request for the ${booking.carName} — reference ${booking.reference}.`,
     heading: `Thanks, ${booking.customer.name.split(" ")[0]} — we've got your request`,
-    intro: `Your request for the <strong>${escapeHtml(booking.carName)}</strong> is in. We review every booking by hand so the car is properly prepped for your occasion — you'll hear back from us within <strong>24 hours</strong> with a confirmation.`,
+    intro: `Your request for the <strong>${escapeHtml(booking.carName)}</strong> is in. One step left: send the ${deposit()} deposit and we'll confirm your booking by email.`,
     body: `
-      ${callout("<strong>This is not a confirmed booking yet.</strong> Nothing has been charged. We'll email you as soon as we've confirmed availability.", "warn")}
-      <h2 style="margin:0 0 12px;font-size:16px;font-weight:700;">Your request</h2>
+      ${depositInstructions(booking)}
+      <h2 style="margin:0 0 12px;font-size:16px;font-weight:700;">Your reservation summary</h2>
       ${detailTable(bookingRows(booking))}
       <h2 style="margin:0 0 12px;font-size:16px;font-weight:700;">Estimated cost</h2>
       ${quoteBlock(booking)}
       <p style="margin:0 0 24px;font-size:13px;line-height:1.6;color:#7c6069;">
         The daily rate is the full price — no added fees and no security
-        deposit. Nothing is charged until pick-up.
+        deposit. Cancel at least ${site.deposit.refundNoticeHours} hours ahead
+        and we'll move your booking deposit to a new date.
       </p>
-      ${button({ label: "See the full fleet", url: `${site.url}/fleet` })}
     `,
     footerNote: `Need to change something? Just reply to this email and quote <strong>${escapeHtml(booking.reference)}</strong>.`,
   });
 
   const text = `Thanks, ${booking.customer.name.split(" ")[0]} — we've got your request.
 
-Your request for the ${booking.carName} is in. We review every booking by hand, and you'll hear back within 24 hours.
+Your request for the ${booking.carName} is in. One step left: send the ${deposit()} deposit and we'll confirm your booking by email.
 
-THIS IS NOT A CONFIRMED BOOKING YET. Nothing has been charged.
+${depositInstructionsText(booking)}
 
 ${plainSummary(booking)}
 
-The daily rate is the full price — no added fees and no security deposit. Nothing is charged until pick-up.
+The daily rate is the full price — no added fees and no security deposit. Cancel at least ${site.deposit.refundNoticeHours} hours ahead and we'll move your booking deposit to a new date.
 
 Need to change something? Just reply to this email and quote ${booking.reference}.
 
 ${site.name} — ${site.url}`;
 
   return {
-    subject: `We got your request — ${booking.carName} (${booking.reference})`,
+    subject: `Send your deposit to lock in the ${booking.carName} (${booking.reference})`,
     html,
     text,
   };
@@ -113,7 +159,7 @@ export function ownerNewRequest(booking: Booking): RenderedEmail {
   const html = emailLayout({
     preheader: `${booking.customer.name} wants the ${booking.carName} on ${formatDateLong(booking.startDate)}.`,
     heading: "New booking request",
-    intro: `<strong>${escapeHtml(booking.customer.name)}</strong> has requested the <strong>${escapeHtml(booking.carName)}</strong>. The dates are held as pending until you confirm or decline.`,
+    intro: `<strong>${escapeHtml(booking.customer.name)}</strong> has requested the <strong>${escapeHtml(booking.carName)}</strong>. They've been asked to send the ${deposit()} deposit with <strong>${escapeHtml(booking.reference)}</strong> in the note. The dates are held until ${escapeHtml(dueBy(booking))} — once the deposit arrives, mark it received in the dashboard to confirm. If it doesn't, the dates free up on their own.`,
     body: `
       ${button({ label: "Open the dashboard", url: `${site.url}/admin/bookings` })}
       <h2 style="margin:0 0 12px;font-size:16px;font-weight:700;">Customer</h2>
@@ -143,7 +189,7 @@ export function ownerNewRequest(booking: Booking): RenderedEmail {
 
   const text = `NEW BOOKING REQUEST
 
-${booking.customer.name} has requested the ${booking.carName}.
+${booking.customer.name} has requested the ${booking.carName}. They've been asked to send the ${deposit()} deposit with ${booking.reference} in the note. Dates are held until ${dueBy(booking)} — if the deposit doesn't arrive, they free up on their own.
 
 Customer
   Name:  ${booking.customer.name}
@@ -152,7 +198,7 @@ Customer
 
 ${plainSummary(booking)}
 ${booking.notes ? `\nTheir notes:\n${booking.notes}\n` : ""}
-Confirm or decline: ${site.url}/admin/bookings`;
+Mark the deposit received: ${site.url}/admin/bookings`;
 
   return {
     subject: `New request: ${booking.carName}, ${formatDateLong(booking.startDate)} — ${booking.customer.name}`,
@@ -172,6 +218,17 @@ export function customerConfirmed(booking: Booking): RenderedEmail {
       ${detailTable(bookingRows(booking))}
       <h2 style="margin:0 0 12px;font-size:16px;font-weight:700;">Cost</h2>
       ${quoteBlock(booking)}
+      ${
+        booking.depositReceivedAt
+          ? detailTable([
+              { label: "Deposit paid", value: deposit() },
+              {
+                label: "Due at pick-up",
+                value: `<strong>${formatMoney(balanceDue(booking.quote.total))}</strong>`,
+              },
+            ])
+          : ""
+      }
       <h2 style="margin:0 0 12px;font-size:16px;font-weight:700;">What to bring</h2>
       <ul style="margin:0 0 24px;padding-left:20px;font-size:14px;line-height:1.8;color:#4a343e;">
         <li>A valid driver's licence (minimum age ${site.minimumAge})</li>
@@ -193,7 +250,7 @@ export function customerConfirmed(booking: Booking): RenderedEmail {
 Your booking for the ${booking.carName} is confirmed.
 
 ${plainSummary(booking)}
-
+${booking.depositReceivedAt ? `Deposit paid: ${deposit()}\nDue at pick-up: ${formatMoney(balanceDue(booking.quote.total))}\n` : ""}
 What to bring:
   - A valid driver's licence (minimum age ${site.minimumAge})
   - A payment card for the balance
@@ -217,9 +274,14 @@ export function customerStatusChanged(booking: Booking): RenderedEmail {
     ? "We couldn't take this booking"
     : "Your booking has been cancelled";
 
+  // Once a deposit has been paid, "nothing has been charged" is no longer true.
+  const moneyLine = booking.depositReceivedAt
+    ? `We'll be in touch about your ${deposit()} deposit.`
+    : "Nothing has been charged.";
+
   const intro = declined
-    ? `Sorry, ${escapeHtml(booking.customer.name.split(" ")[0])} — we aren't able to take your request for the <strong>${escapeHtml(booking.carName)}</strong> on those dates. Nothing has been charged.`
-    : `Your booking for the <strong>${escapeHtml(booking.carName)}</strong> has been cancelled. Nothing has been charged.`;
+    ? `Sorry, ${escapeHtml(booking.customer.name.split(" ")[0])} — we aren't able to take your request for the <strong>${escapeHtml(booking.carName)}</strong> on those dates. ${moneyLine}`
+    : `Your booking for the <strong>${escapeHtml(booking.carName)}</strong> has been cancelled. ${moneyLine}`;
 
   const html = emailLayout({
     preheader: `${heading} — ${booking.reference}`,
@@ -242,7 +304,7 @@ export function customerStatusChanged(booking: Booking): RenderedEmail {
 
   const text = `${heading.toUpperCase()}
 
-${declined ? `We aren't able to take your request for the ${booking.carName} on those dates.` : `Your booking for the ${booking.carName} has been cancelled.`} Nothing has been charged.
+${declined ? `We aren't able to take your request for the ${booking.carName} on those dates.` : `Your booking for the ${booking.carName} has been cancelled.`} ${moneyLine}
 
 ${plainSummary(booking)}
 ${booking.ownerNote ? `\nA note from us:\n${booking.ownerNote}\n` : ""}

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { formatDateLong, formatTime } from "@/lib/dates";
+import { formatDateLong, formatDateTime, formatTime } from "@/lib/dates";
 import { getBookingByReference } from "@/lib/bookings";
-import { formatMoney } from "@/lib/site";
+import { balanceDue, isHoldExpired, paymentMethods } from "@/lib/deposit";
+import { formatMoney, site } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,13 @@ export default async function ConfirmationPage({ searchParams }: PageProps) {
 
   // Older bookings have no delivery record; assume the email went out rather
   // than alarming someone about a send that probably succeeded.
+  const needsDeposit =
+    booking !== null &&
+    booking.status === "pending" &&
+    booking.depositDueBy !== undefined &&
+    !isHoldExpired(booking);
+  const methods = paymentMethods();
+
   const emailReachedCustomer =
     booking !== null &&
     (booking.emailDelivery === undefined ||
@@ -31,32 +39,41 @@ export default async function ConfirmationPage({ searchParams }: PageProps) {
   return (
     <section className="container-page py-20">
       <div className="mx-auto max-w-2xl text-center">
+        {/* A party popper and "Request received" read as finished. Until the
+            deposit is in, the headline has to be the step that's left. */}
         <span
           aria-hidden
-          className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-mint/15 text-4xl"
+          className={`mx-auto grid h-20 w-20 place-items-center rounded-full text-4xl ${
+            needsDeposit ? "bg-sun/20" : "bg-mint/15"
+          }`}
         >
-          🎉
+          {needsDeposit ? "⏳" : "🎉"}
         </span>
 
         <h1 className="mt-7 font-display text-5xl font-extrabold sm:text-6xl">
-          Request received
+          {needsDeposit
+            ? `Almost done — send your ${formatMoney(site.deposit.amount)} deposit`
+            : "Request received"}
         </h1>
 
         {/* Only claim the email was sent if it actually was. Saying "we've
             emailed you" after a failed send sends people hunting through spam
             for something that was never delivered. */}
         <p className="mt-5 text-lg leading-relaxed text-ink-2">
-          {emailReachedCustomer ? (
+          {needsDeposit ? (
             <>
-              We’ve emailed you a copy at {booking.customer.email}. We review
-              every booking by hand — expect your confirmation within{" "}
-              <strong>24 hours</strong>.
+              Your booking <strong>isn’t confirmed yet</strong>. Your dates are
+              held until the time below — send the deposit to lock them in.
+              {emailReachedCustomer && (
+                <> We’ve also emailed these details to {booking.customer.email}.</>
+              )}
+            </>
+          ) : emailReachedCustomer ? (
+            <>
+              We’ve emailed you a copy at {booking.customer.email}.
             </>
           ) : (
-            <>
-              We’ve got your request and we review every booking by hand —
-              expect to hear from us within <strong>24 hours</strong>.
-            </>
+            <>We’ve got your request.</>
           )}
         </p>
 
@@ -79,11 +96,63 @@ export default async function ConfirmationPage({ searchParams }: PageProps) {
         )}
       </div>
 
+      {needsDeposit && booking.depositDueBy && (
+        <div className="card mx-auto mt-12 max-w-2xl overflow-hidden border-sun">
+          <div className="border-b border-line bg-sun/10 px-7 py-4">
+            <h2 className="font-display text-lg font-extrabold">
+              Send your {formatMoney(site.deposit.amount)} deposit by{" "}
+              {formatDateTime(booking.depositDueBy)}
+            </h2>
+            <p className="mt-1 text-sm text-ink-2">
+              If it hasn’t arrived by then, your dates are released for someone
+              else.
+            </p>
+          </div>
+
+          {methods.length > 0 ? (
+            <dl className="divide-y divide-line px-7">
+              {methods.map((method) => (
+                <div
+                  key={method.label}
+                  className="flex flex-wrap justify-between gap-3 py-4"
+                >
+                  <dt className="text-sm text-muted">{method.label}</dt>
+                  <dd className="text-sm font-bold">
+                    {method.url ? (
+                      <a
+                        href={method.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-brand underline"
+                      >
+                        {method.value}
+                      </a>
+                    ) : (
+                      method.value
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p className="px-7 py-4 text-sm">
+              We’ll text you how to send it.
+            </p>
+          )}
+
+          <p className="border-t border-line bg-paper-2 px-7 py-4 text-sm leading-relaxed">
+            Put <strong className="font-mono">{booking.reference}</strong> in
+            the payment note so we can match it to you. We’ll email your
+            confirmation once it arrives.
+          </p>
+        </div>
+      )}
+
       {booking && (
         <div className="card mx-auto mt-12 max-w-2xl overflow-hidden">
           <div className="border-b border-line bg-paper-2 px-7 py-4">
             <h2 className="font-display text-lg font-extrabold">
-              What you asked for
+              Your reservation summary
             </h2>
           </div>
 
@@ -121,8 +190,11 @@ export default async function ConfirmationPage({ searchParams }: PageProps) {
           </dl>
 
           <p className="border-t border-line bg-paper-2 px-7 py-4 text-xs leading-relaxed text-muted">
-            This is a request, not a confirmed booking, and nothing has been
-            charged. There’s no deposit — you pay the total at pick-up.
+            The {formatMoney(site.deposit.amount)} deposit comes off your
+            total — the remaining{" "}
+            {formatMoney(balanceDue(booking.quote.total))} is due at pick-up.
+            Cancel at least {site.deposit.refundNoticeHours} hours ahead and
+            we’ll move your deposit to a new date.
           </p>
         </div>
       )}

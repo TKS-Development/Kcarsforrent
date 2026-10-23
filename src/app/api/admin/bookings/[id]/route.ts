@@ -20,6 +20,8 @@ const patchSchema = z.object({
   ownerNote: z.string().max(2000).optional(),
   /** Set false to change the status without emailing the customer. */
   notify: z.boolean().optional().default(true),
+  /** The owner is confirming because the deposit came in. */
+  depositReceived: z.boolean().optional().default(false),
 });
 
 export async function PATCH(
@@ -46,7 +48,7 @@ export async function PATCH(
     );
   }
 
-  const { status, ownerNote, notify } = parsed.data;
+  const { status, ownerNote, notify, depositReceived } = parsed.data;
 
   const existing = await getBooking(id);
   if (!existing) {
@@ -77,6 +79,9 @@ export async function PATCH(
     id,
     status as (typeof BOOKING_STATUSES)[number],
     ownerNote,
+    depositReceived && !existing.depositReceivedAt
+      ? { depositReceivedAt: new Date().toISOString() }
+      : {},
   );
   if (!updated) {
     return NextResponse.json({ message: "Booking not found." }, { status: 404 });

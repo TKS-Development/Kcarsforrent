@@ -11,6 +11,7 @@ import {
   newReference,
   saveBooking,
 } from "@/lib/bookings";
+import { newDepositDueBy } from "@/lib/deposit";
 import { ownerRecipients, sendEmail, type SendResult } from "@/lib/email";
 import { carDisplayName, getCarById } from "@/lib/fleet";
 import { rentalDays, todayISO } from "@/lib/dates";
@@ -182,6 +183,7 @@ async function handleBooking(request: Request) {
       endDate: input.endDate,
     }),
     ownerNote: "",
+    depositDueBy: newDepositDueBy(),
     createdAt: now,
     updatedAt: now,
   };

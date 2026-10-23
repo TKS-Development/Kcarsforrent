@@ -83,6 +83,14 @@ export interface Booking {
   /** Internal note the owner can add from the dashboard. */
   ownerNote: string;
   /**
+   * When an unpaid request stops holding its dates. Absent on requests taken
+   * before deposits existed — those customers were never asked for one, so
+   * their holds don't lapse.
+   */
+  depositDueBy?: string;
+  /** When the owner marked the deposit as received. */
+  depositReceivedAt?: string;
+  /**
    * Whether the confirmation emails actually went out. Absent on bookings
    * taken before this was recorded.
    */

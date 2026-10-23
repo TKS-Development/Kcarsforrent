@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { CarPhoto } from "@/components/CarCard";
-import { formatMoney } from "@/lib/site";
+import { formatMoney, site } from "@/lib/site";
 import type { Car } from "@/lib/types";
 
 /**
@@ -66,7 +66,7 @@ export function FeaturedCar({ car }: { car: Car }) {
         </div>
 
         <p className="mt-4 text-xs text-muted">
-          Free to request · Nothing charged until pick-up · No deposit
+          {formatMoney(site.deposit.amount)} deposit holds your date · Rest due at pick-up
         </p>
       </div>
     </article>

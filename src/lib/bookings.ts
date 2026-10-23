@@ -1,13 +1,9 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
 import { rangesOverlap } from "./dates";
+import { blocksDates } from "./deposit";
 import { getStore } from "./store";
-import {
-  BLOCKING_STATUSES,
-  type Blackout,
-  type Booking,
-  type BookingStatus,
-} from "./types";
+import type { Blackout, Booking, BookingStatus } from "./types";
 
 const BOOKING_PREFIX = "bookings/";
 const BLACKOUT_KEY = "blackouts";
@@ -61,12 +57,14 @@ export async function updateBookingStatus(
   id: string,
   status: BookingStatus,
   ownerNote?: string,
+  changes: Partial<Pick<Booking, "depositReceivedAt">> = {},
 ): Promise<Booking | null> {
   const booking = await getBooking(id);
   if (!booking) return null;
 
   const updated: Booking = {
     ...booking,
+    ...changes,
     status,
     ownerNote: ownerNote ?? booking.ownerNote,
     updatedAt: new Date().toISOString(),
@@ -119,7 +117,8 @@ export interface AvailabilityResult {
  *
  * Blocked by any pending or confirmed booking that overlaps, and by any
  * blackout range covering the car (or all cars). Declined and cancelled
- * bookings release their dates.
+ * bookings release their dates, and so does a pending request whose deposit
+ * window lapsed.
  */
 export async function checkAvailability(
   carId: string,
@@ -136,7 +135,7 @@ export async function checkAvailability(
     (booking) =>
       booking.carId === carId &&
       booking.id !== options.ignoreBookingId &&
-      BLOCKING_STATUSES.includes(booking.status) &&
+      blocksDates(booking) &&
       rangesOverlap(startDate, endDate, booking.startDate, booking.endDate),
   );
 
@@ -187,6 +186,7 @@ export async function findOwnPendingRequest(
         booking.carId === carId &&
         booking.startDate === startDate &&
         booking.endDate === endDate &&
+        blocksDates(booking) &&
         booking.status === "pending" &&
         booking.customer.email.trim().toLowerCase() === target,
     ) ?? null
@@ -207,7 +207,7 @@ export async function getUnavailableDates(
 
   const ranges = bookings
     .filter(
-      (b) => b.carId === carId && BLOCKING_STATUSES.includes(b.status),
+      (b) => b.carId === carId && blocksDates(b),
     )
     .map((b) => ({ startDate: b.startDate, endDate: b.endDate }));
 

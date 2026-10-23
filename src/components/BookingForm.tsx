@@ -525,8 +525,9 @@ export function BookingForm({ cars }: { cars: Car[] }) {
                 </div>
 
                 <p className="mt-3 text-xs leading-relaxed text-muted">
-                  That’s the full price — no deposit, and nothing is charged
-                  until pick-up.
+                  That’s the full price, no added fees. A{" "}
+                  {formatMoney(site.deposit.amount)} deposit holds your date and
+                  comes off this total — the rest is due at pick-up.
                 </p>
               </>
             ) : (
@@ -544,8 +545,9 @@ export function BookingForm({ cars }: { cars: Car[] }) {
             </button>
 
             <p className="mt-3 text-center text-xs leading-relaxed text-muted">
-              Free to request. Nothing is charged now — we’ll email you a
-              confirmation within 24 hours.
+              Nothing is charged here. Next you’ll get Venmo / Zelle details
+              for the {formatMoney(site.deposit.amount)} deposit — your dates
+              are held for {site.deposit.holdHours} hours while you send it.
             </p>
           </div>
         </div>
