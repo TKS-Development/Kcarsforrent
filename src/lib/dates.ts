@@ -113,3 +113,18 @@ export function formatTime(value: string): string {
   const hour12 = h % 12 === 0 ? 12 : h % 12;
   return `${hour12}:${String(m).padStart(2, "0")} ${suffix}`;
 }
+
+/** "Fri, Oct 24, 3:00 PM" for a full timestamp, in the business's timezone. */
+export function formatDateTime(
+  iso: string,
+  timeZone = "America/Los_Angeles",
+): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(iso));
+}

@@ -3,13 +3,13 @@ import { Suspense } from "react";
 
 import { BookingForm } from "@/components/BookingForm";
 import { getActiveCars } from "@/lib/fleet";
-import { site } from "@/lib/site";
+import { formatMoney, site } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Book a car",
-  description: `Request a themed Kei car from ${site.name}. Free to request — nothing is charged until pick-up.`,
+  description: `Request a themed Kei car from ${site.name}. A ${formatMoney(site.deposit.amount)} deposit holds your date.`,
   robots: { index: true, follow: true },
 };
 
@@ -26,8 +26,8 @@ export default async function BookPage() {
           </h1>
           <p className="mt-5 max-w-xl text-lg leading-relaxed text-ink-2">
             {cars.length === 1
-              ? "Tell us when you need it. We'll check the dates are free, prep the car for your occasion, and email your confirmation within 24 hours."
-              : "Tell us which car and when. We'll check it's free, prep it for your occasion, and email your confirmation within 24 hours."}
+              ? `Tell us when you need it. Send the ${formatMoney(site.deposit.amount)} deposit and we'll lock in your dates and prep the car for your occasion.`
+              : `Tell us which car and when. Send the ${formatMoney(site.deposit.amount)} deposit and we'll lock in your dates and prep the car for your occasion.`}
           </p>
         </div>
       </section>

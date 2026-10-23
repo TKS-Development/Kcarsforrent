@@ -193,6 +193,12 @@ export default async function CarPage({ params }: PageProps) {
                 <span>Security deposit</span>
                 <span className="font-semibold text-ink-2">None</span>
               </li>
+              <li className="flex justify-between gap-4">
+                <span>Booking deposit</span>
+                <span className="font-semibold text-ink-2">
+                  {formatMoney(site.deposit.amount)}, off your total
+                </span>
+              </li>
             </ul>
 
             <Link
@@ -202,7 +208,7 @@ export default async function CarPage({ params }: PageProps) {
               Request these dates
             </Link>
             <p className="mt-3 text-center text-xs text-muted">
-              Free to request · Nothing charged until pick-up
+              {formatMoney(site.deposit.amount)} deposit holds your date · Rest due at pick-up
             </p>
           </div>
         </div>

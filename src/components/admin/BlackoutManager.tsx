@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { formatDateShort, todayISO } from "@/lib/dates";
-import { BLOCKING_STATUSES, type Blackout, type Booking, type Car } from "@/lib/types";
+import { blocksDates } from "@/lib/deposit";
+import type { Blackout, Booking, Car } from "@/lib/types";
 
 export function BlackoutManager({
   cars,
@@ -33,7 +34,7 @@ export function BlackoutManager({
   // Confirmed and pending bookings block dates too — showing them here means
   // the owner sees one complete picture of what's unavailable and why.
   const held = bookings
-    .filter((b) => BLOCKING_STATUSES.includes(b.status) && b.endDate >= today)
+    .filter((b) => blocksDates(b) && b.endDate >= today)
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
 
   const upcomingBlackouts = [...blackouts]

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { site } from "@/lib/site";
+import { formatMoney, site } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "FAQ",
@@ -24,7 +24,7 @@ const FAQS = [
   },
   {
     q: "Am I paying when I submit the booking form?",
-    a: "No. Submitting the form sends us a request — nothing is charged. We confirm by email within 24 hours, and you pay at pick-up.",
+    a: `No — the form itself charges nothing. To hold your date you send a ${formatMoney(site.deposit.amount)} deposit by Venmo or Zelle within ${site.deposit.holdHours} hours. We confirm by email once it arrives, the deposit comes off your total, and you pay the rest at pick-up.`,
   },
   {
     q: "Is insurance included?",
@@ -40,7 +40,7 @@ const FAQS = [
   },
   {
     q: "What if I need to cancel or change my dates?",
-    a: "Let us know as early as you can and we'll do our best to move you. Since nothing is charged until pick-up, cancelling a request costs you nothing.",
+    a: `Let us know as early as you can. Cancel or change at least ${site.deposit.refundNoticeHours} hours before pick-up and we'll move your deposit to a new date. Later cancellations and no-shows forfeit the deposit.`,
   },
   {
     q: "Can you build a custom theme for my event?",

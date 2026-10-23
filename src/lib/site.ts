@@ -10,6 +10,21 @@ export interface SocialLinks {
   instagramHandle: string | null;
 }
 
+export interface DepositConfig {
+  /** Booking deposit, in whole currency units. Applied toward the rental total. */
+  amount: number;
+  /** How long a new request holds its dates before it's released unpaid. */
+  holdHours: number;
+  /** Venmo username without the @, or null to leave Venmo off. */
+  venmo: string | null;
+  /** Phone number or email Zelle is registered to, or null to leave Zelle off. */
+  zelle: string | null;
+  /** Name the customer sees on the Zelle payment, so they know it's the right person. */
+  zelleName: string | null;
+  /** Cancel at least this far ahead and the deposit moves to a new date. */
+  refundNoticeHours: number;
+}
+
 export interface SiteConfig {
   name: string;
   legalName: string;
@@ -32,6 +47,7 @@ export interface SiteConfig {
   social: SocialLinks;
   currency: string;
   minimumAge: number;
+  deposit: DepositConfig;
 }
 
 /**
@@ -92,6 +108,19 @@ export const site: SiteConfig = {
 
   /** Minimum age to rent. Shown on the policies page and the booking form. */
   minimumAge: 21,
+
+  // Every new request holds its dates only until this deposit arrives. Unpaid
+  // holds lapse on their own, so a request nobody follows up on can't block
+  // the calendar. Payment is by hand (Venmo / Zelle), so the owner marks it
+  // received from the dashboard.
+  deposit: {
+    amount: 50,
+    holdHours: 24,
+    venmo: "Yuval-De-Medonsa",
+    zelle: "480-658-5391",
+    zelleName: "Yuval De-Medonsa",
+    refundNoticeHours: 48,
+  },
 };
 
 export function formatMoney(amount: number): string {

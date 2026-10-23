@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { site } from "@/lib/site";
+import { formatMoney, site } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Rental policies",
@@ -29,17 +29,17 @@ const SECTIONS = [
   {
     title: "Bookings and confirmation",
     items: [
-      "Submitting the booking form creates a request, not a confirmed rental. Your dates are held while we review it.",
-      "We aim to confirm or decline every request within 24 hours by email.",
-      "No payment is taken at the point of request. The rental balance is due at pick-up.",
+      "Submitting the booking form creates a request, not a confirmed rental.",
+      `A request holds your dates for ${site.deposit.holdHours} hours. Send the ${formatMoney(site.deposit.amount)} booking deposit within that time to lock them in; if it doesn't arrive, the dates are released.`,
+      "We confirm your booking by email once the deposit is received.",
       "Prices shown on the site are estimates based on the dates and options you select, and are confirmed in writing when we accept the booking.",
     ],
   },
   {
     title: "Payment",
     items: [
-      "Submitting the booking form costs nothing and charges nothing — it is a request, not a confirmed rental.",
-      "The rental balance is payable before the keys are handed over. The daily rate is the full price — no added fees and no security deposit.",
+      `A ${formatMoney(site.deposit.amount)} booking deposit, paid by Venmo or Zelle, is required to confirm a booking. It is applied toward your rental total.`,
+      "The remaining balance is payable before the keys are handed over. The daily rate is the full price — no added fees and no security deposit.",
     ],
   },
   {
@@ -80,9 +80,10 @@ const SECTIONS = [
   {
     title: "Cancellations and changes",
     items: [
-      "Cancelling an unconfirmed request costs nothing.",
-      "For confirmed bookings, please give us at least 48 hours' notice of a cancellation or change so we can re-let the dates.",
-      "We will always try to move your booking rather than cancel it. If we have to cancel on you, you pay nothing.",
+      "Cancelling a request before you've sent the deposit costs nothing.",
+      `Cancel or change a confirmed booking at least ${site.deposit.refundNoticeHours} hours before pick-up and we'll move your deposit to a new date.`,
+      `Cancellations with less than ${site.deposit.refundNoticeHours} hours' notice, and no-shows, forfeit the deposit.`,
+      "If we have to cancel on you, your deposit is refunded in full.",
     ],
   },
   {
