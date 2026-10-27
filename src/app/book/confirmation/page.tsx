@@ -31,6 +31,15 @@ export default async function ConfirmationPage({ searchParams }: PageProps) {
     !isHoldExpired(booking);
   const methods = paymentMethods();
 
+  // A customer can come back to this link after the booking stopped being
+  // live. Greeting them with "Request received" then says the opposite of
+  // what happened.
+  const released = booking !== null && isHoldExpired(booking);
+  const closed =
+    released ||
+    booking?.status === "declined" ||
+    booking?.status === "cancelled";
+
   const emailReachedCustomer =
     booking !== null &&
     (booking.emailDelivery === undefined ||
@@ -44,23 +53,42 @@ export default async function ConfirmationPage({ searchParams }: PageProps) {
         <span
           aria-hidden
           className={`mx-auto grid h-20 w-20 place-items-center rounded-full text-4xl ${
-            needsDeposit ? "bg-sun/20" : "bg-mint/15"
+            closed ? "bg-stone-200" : needsDeposit ? "bg-sun/20" : "bg-mint/15"
           }`}
         >
-          {needsDeposit ? "⏳" : "🎉"}
+          {closed ? "📅" : needsDeposit ? "⏳" : "🎉"}
         </span>
 
         <h1 className="mt-7 font-display text-5xl font-extrabold sm:text-6xl">
-          {needsDeposit
-            ? `Almost done — send your ${formatMoney(site.deposit.amount)} deposit`
-            : "Request received"}
+          {released
+            ? "This booking was released"
+            : closed
+              ? booking?.status === "declined"
+                ? "We couldn’t take this booking"
+                : "This booking was cancelled"
+              : needsDeposit
+                ? `Almost done — send your ${formatMoney(site.deposit.amount)} deposit`
+                : "Request received"}
         </h1>
 
         {/* Only claim the email was sent if it actually was. Saying "we've
             emailed you" after a failed send sends people hunting through spam
             for something that was never delivered. */}
         <p className="mt-5 text-lg leading-relaxed text-ink-2">
-          {needsDeposit ? (
+          {released && booking?.depositDueBy ? (
+            <>
+              We didn’t receive the {formatMoney(site.deposit.amount)} deposit
+              by {formatDateTime(booking.depositDueBy)}, so these dates were
+              released. <strong>Nothing has been charged.</strong> Still want
+              the car? Book again — if the dates are open, they’re yours once
+              the deposit is in.
+            </>
+          ) : closed ? (
+            <>
+              This booking is no longer active. Other cars and other dates may
+              well be open — we’d love to get you out in one of ours.
+            </>
+          ) : needsDeposit ? (
             <>
               Your booking <strong>isn’t confirmed yet</strong>. Your dates are
               held until the time below — send the deposit to lock them in.
@@ -77,7 +105,7 @@ export default async function ConfirmationPage({ searchParams }: PageProps) {
           )}
         </p>
 
-        {booking && !emailReachedCustomer && (
+        {booking && !emailReachedCustomer && !closed && (
           <p className="mx-auto mt-5 max-w-lg rounded-xl border-[1.5px] border-sun bg-sun/10 px-4 py-3 text-sm leading-relaxed text-ink-2">
             We couldn’t send your confirmation email just now, so please save
             your reference below. Your request did reach us — nothing is lost.
@@ -189,32 +217,49 @@ export default async function ConfirmationPage({ searchParams }: PageProps) {
             ))}
           </dl>
 
-          <p className="border-t border-line bg-paper-2 px-7 py-4 text-xs leading-relaxed text-muted">
-            The {formatMoney(site.deposit.amount)} deposit comes off your
-            total — the remaining{" "}
-            {formatMoney(balanceDue(booking.quote.total))} is due at pick-up.
-            Cancel at least {site.deposit.refundNoticeHours} hours ahead and
-            we’ll move your deposit to a new date.
-          </p>
+          {!closed && (
+            <p className="border-t border-line bg-paper-2 px-7 py-4 text-xs leading-relaxed text-muted">
+              The {formatMoney(site.deposit.amount)} deposit comes off your
+              total — the remaining{" "}
+              {formatMoney(balanceDue(booking.quote.total))} is due at pick-up.
+              Cancel at least {site.deposit.refundNoticeHours} hours ahead and
+              we’ll move your deposit to a new date.
+            </p>
+          )}
         </div>
       )}
 
       <div className="mt-12 flex flex-wrap justify-center gap-3">
-        <Link href="/fleet" className="btn btn-ghost">
-          Back to the fleet
-        </Link>
-        <Link href="/contact" className="btn btn-primary">
-          Get in touch
-        </Link>
+        {closed ? (
+          <>
+            <Link href="/contact" className="btn btn-ghost">
+              Get in touch
+            </Link>
+            <Link href="/book" className="btn btn-primary">
+              Book again
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link href="/fleet" className="btn btn-ghost">
+              Back to the fleet
+            </Link>
+            <Link href="/contact" className="btn btn-primary">
+              Get in touch
+            </Link>
+          </>
+        )}
       </div>
 
-      <p className="mt-8 text-center text-sm text-muted">
-        Didn’t get an email? Check your spam folder, or{" "}
-        <Link href="/contact" className="font-bold text-brand underline">
-          get in touch
-        </Link>
-        {ref && <> quoting {ref}</>}.
-      </p>
+      {!closed && (
+        <p className="mt-8 text-center text-sm text-muted">
+          Didn’t get an email? Check your spam folder, or{" "}
+          <Link href="/contact" className="font-bold text-brand underline">
+            get in touch
+          </Link>
+          {ref && <> quoting {ref}</>}.
+        </p>
+      )}
     </section>
   );
 }
