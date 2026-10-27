@@ -315,6 +315,78 @@ ${site.name} — ${site.url}`;
   return { subject: `${heading} — ${booking.reference}`, html, text };
 }
 
+/** Sent when an unpaid hold lapses and the dates go back on the calendar. */
+export function customerHoldReleased(booking: Booking): RenderedEmail {
+  const firstName = booking.customer.name.split(" ")[0];
+  const deadline = booking.depositDueBy
+    ? formatDateTime(booking.depositDueBy)
+    : "the deadline";
+  const { phone, email } = site.bookingContact;
+  const ig = site.social.instagram;
+  const link = (href: string, label: string) =>
+    `<a href="${escapeHtml(href)}" style="color:#d6206a;">${escapeHtml(label)}</a>`;
+
+  const contactHtml = [
+    ig ? `DM us on Instagram ${link(ig, site.social.instagramHandle ?? "Instagram")}` : null,
+    email ? `email ${link(`mailto:${email}`, email)}` : null,
+    phone ? `call or text ${link(`tel:${phone.replace(/[^\d+]/g, "")}`, phone)}` : null,
+    "reply to this email",
+  ].filter(Boolean) as string[];
+
+  const contactText = [
+    ig ? `DM us on Instagram ${site.social.instagramHandle ?? ig}` : null,
+    email ? `email ${email}` : null,
+    phone ? `call or text ${phone}` : null,
+    "reply to this email",
+  ].filter(Boolean) as string[];
+
+  /** "A, b or c", capitalised to start a sentence. */
+  const joinOr = (items: string[]) => {
+    const joined =
+      items.length > 1
+        ? `${items.slice(0, -1).join(", ")} or ${items[items.length - 1]}`
+        : items[0];
+    return joined.charAt(0).toUpperCase() + joined.slice(1);
+  };
+
+  const html = emailLayout({
+    preheader: `Your hold on the ${booking.carName} for ${formatDateLong(booking.startDate)} has been released.`,
+    heading: "Your booking has been released",
+    intro: `Hi ${escapeHtml(firstName)} — we didn't receive the ${deposit()} deposit for your <strong>${escapeHtml(booking.carName)}</strong> booking by ${escapeHtml(deadline)}, so the dates have been released and the booking is cancelled. Nothing has been charged.`,
+    body: `
+      ${detailTable(bookingRows(booking))}
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#4a343e;">
+        Still want the car, or need different dates? Book again below — if the
+        dates are still open, they're yours once the deposit is in.
+      </p>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#4a343e;">
+        Questions, or want help rescheduling? ${joinOr(contactHtml)} — we're
+        happy to help.
+      </p>
+      ${button({ label: "Book again", url: `${site.url}/book` })}
+    `,
+    footerNote: `Reference: <strong>${escapeHtml(booking.reference)}</strong>`,
+  });
+
+  const text = `YOUR BOOKING HAS BEEN RELEASED
+
+Hi ${firstName} — we didn't receive the ${deposit()} deposit for your ${booking.carName} booking by ${deadline}, so the dates have been released and the booking is cancelled. Nothing has been charged.
+
+${plainSummary(booking)}
+
+Still want the car, or need different dates? Book again at ${site.url}/book — if the dates are still open, they're yours once the deposit is in.
+
+Questions, or want help rescheduling? ${joinOr(contactText)} — we're happy to help.
+
+${site.name} — ${site.url}`;
+
+  return {
+    subject: `Your booking was released — ${booking.carName} (${booking.reference})`,
+    html,
+    text,
+  };
+}
+
 /** Contact form relay to the owner. */
 export function contactMessage(input: {
   name: string;

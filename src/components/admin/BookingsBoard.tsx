@@ -449,7 +449,16 @@ function DepositRow({ booking, expired }: { booking: Booking; expired: boolean }
   }
   if (!booking.depositDueBy) return null;
   if (expired) {
-    return <Row label="Deposit" value="Never came · dates released" />;
+    return (
+      <Row
+        label="Deposit"
+        value={
+          booking.releaseNotifiedAt
+            ? "Never came · customer emailed"
+            : "Never came · dates released"
+        }
+      />
+    );
   }
   if (booking.status !== "pending") return null;
   return (

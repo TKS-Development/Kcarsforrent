@@ -30,6 +30,20 @@ export function blocksDates(booking: Booking, now = Date.now()): boolean {
   return BLOCKING_STATUSES.includes(booking.status) && !isHoldExpired(booking, now);
 }
 
+/**
+ * Lapsed holds older than this are never emailed. Without a cut-off, the
+ * first run after this shipped would have written to everyone whose hold had
+ * ever lapsed — days late, about dates long gone.
+ */
+const RELEASE_NOTICE_WINDOW_MS = 48 * 3_600_000;
+
+/** A lapsed hold whose customer hasn't yet been told the dates were released. */
+export function needsReleaseNotice(booking: Booking, now = Date.now()): boolean {
+  if (!isHoldExpired(booking, now) || booking.releaseNotifiedAt) return false;
+  const lapsedAt = new Date(booking.depositDueBy as string).getTime();
+  return now - lapsedAt <= RELEASE_NOTICE_WINDOW_MS;
+}
+
 /** What's left to pay at pick-up once the deposit is in. */
 export function balanceDue(total: number): number {
   return Math.max(0, total - site.deposit.amount);

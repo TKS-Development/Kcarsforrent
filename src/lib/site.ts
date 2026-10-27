@@ -25,6 +25,16 @@ export interface DepositConfig {
   refundNoticeHours: number;
 }
 
+/**
+ * Ways to reach the owner, shown only inside emails to customers who have
+ * booked — never on the public site, which deliberately lists no phone or
+ * email.
+ */
+export interface BookingContact {
+  phone: string | null;
+  email: string | null;
+}
+
 export interface SiteConfig {
   name: string;
   legalName: string;
@@ -48,6 +58,7 @@ export interface SiteConfig {
   currency: string;
   minimumAge: number;
   deposit: DepositConfig;
+  bookingContact: BookingContact;
 }
 
 /**
@@ -97,11 +108,11 @@ export const site: SiteConfig = {
     { days: "Sunday", time: "By appointment" },
   ],
 
-  // No Instagram yet. Fill both fields in and the links reappear in the footer
-  // and on the contact page automatically — nothing else needs changing.
+  // Shown in the footer, on the contact page and in booking emails. Set both
+  // to null to hide it everywhere.
   social: {
-    instagram: null,
-    instagramHandle: null,
+    instagram: "https://www.instagram.com/k_cars_for_rent",
+    instagramHandle: "@k_cars_for_rent",
   },
 
   currency: "USD",
@@ -120,6 +131,11 @@ export const site: SiteConfig = {
     zelle: "480-658-5391",
     zelleName: "Yuval De-Medonsa",
     refundNoticeHours: 48,
+  },
+
+  bookingContact: {
+    phone: "(480) 658-5391",
+    email: "yuvaldm@gmail.com",
   },
 };
 

@@ -90,6 +90,8 @@ export interface Booking {
   depositDueBy?: string;
   /** When the owner marked the deposit as received. */
   depositReceivedAt?: string;
+  /** When the customer was emailed that their unpaid hold was released. */
+  releaseNotifiedAt?: string;
   /**
    * Whether the confirmation emails actually went out. Absent on bookings
    * taken before this was recorded.
